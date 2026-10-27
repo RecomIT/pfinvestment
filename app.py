@@ -1,7 +1,7 @@
 """Vercel entry point: Vercel loads the `app` object from this file (app.py at the project root).
 
 The data lives in the Neon Postgres database connected to the Vercel project (DATABASE_URL).
-If  check the database is not connected yet, every page explains what to do instead of crashing.
+If the database is not connected yet, every page explains what to do instead of crashing.
 """
 import logging
 
@@ -33,12 +33,16 @@ def _setup_app(reason: str) -> FastAPI:
     return fallback
 
 
-if not database_url():
-    app = _setup_app("The DATABASE_URL setting is missing.")
-else:
+def _build_app() -> FastAPI:
+    if not database_url():
+        return _setup_app("The DATABASE_URL setting is missing.")
     try:
-        app = create_cloud_app()
+        return create_cloud_app()
     except Exception as exc:                                   # wrong password, database paused, ...
         logging.getLogger("bond_app").exception("could not connect to the database")
-        app = _setup_app("The app could not connect to the database (" + type(exc).__name__ +
-                         "). Check that the Neon database is connected and running.")
+        return _setup_app("The app could not connect to the database (" + type(exc).__name__ +
+                          "). Check that the Neon database is connected and running.")
+
+
+# Vercel looks for this exact top-level line: "app = ..." (not inside an if/try block).
+app = _build_app()
