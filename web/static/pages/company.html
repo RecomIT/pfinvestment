@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Company · Bond Amortization</title>
+<link rel="stylesheet" href="/static/css/app.css">
+<link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+</head>
+<body>
+<main>
+  <div class="crumbs"><a href="/">Companies</a> / <span id="crumb"></span></div>
+  <div class="page-head">
+    <div><h1 id="title">Company</h1><div class="muted" id="sub"></div></div>
+    <div class="actions">
+      <label class="check small"><input type="checkbox" id="arch"> Show archived funds</label>
+      <button id="settings" hidden>Company settings</button>
+      <button class="primary" id="new" hidden>New fund</button>
+    </div>
+  </div>
+  <div id="msg" hidden></div>
+  <div class="panel flush">
+    <div class="panel-head"><h2>Funds</h2><span class="muted small">Each fund has its own bonds and Annexure-D</span></div>
+    <div class="table-wrap"><table id="t"></table></div>
+  </div>
+</main>
+<script src="/static/js/core.js"></script>
+<script src="/static/js/fund_form.js"></script>
+<script>
+(async () => {
+  const me = await App.init({ nav: "funds" });
+  if (!me) return;
+  const code = App.qs("code");
+  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  let company;
+  try { company = await App.api("GET", "/api/companies/" + encodeURIComponent(code)); }
+  catch (e) { App.message("#msg", "bad", e.message); return; }
+  document.title = company.name + " · Bond Amortization";
+  App.$("#crumb").textContent = company.code;
+  App.$("#title").textContent = company.name;
+  App.$("#sub").textContent = company.code + (company.archived ? " · archived" : "");
+  if (App.can("admin")) {
+    App.$("#settings").hidden = false; App.$("#new").hidden = false;
+    App.$("#settings").onclick = () => App.companyDialog(company, () => location.reload());
+    App.$("#new").onclick = () => App.fundDialog(null, (f) => { location.href = App.url("/fund", { code: f.code }); }, company.code);
+  }
+  async function load() {
+    try {
+      const funds = await App.api("GET", App.url("/api/funds", { company: company.code, include_archived: App.$("#arch").checked }));
+      App.renderTable(App.$("#t"), [
+        { label: "Fund code", html: true, get: (f) => '<a href="' + App.url("/fund", { code: f.code }) + '">' + App.esc(f.code) + "</a>" },
+        { label: "Fund name", key: "name" },
+        { label: "Year end", get: (f) => f.year_end_day + " " + months[f.year_end_month - 1] },
+        { label: "TDS rate", key: "tds_rate", type: "pct", dp: 2 },
+        { label: "", html: true, get: (f) => (f.archived ? '<span class="badge">archived</span> ' : "") +
+            '<a href="' + App.url("/annexure", { code: f.code }) + '">Annexure-D</a>' },
+      ], funds);
+    } catch (e) { App.message("#msg", "bad", e.message); }
+  }
+  App.$("#arch").addEventListener("change", load);
+  load();
+})();
+</script>
+</body>
+</html>

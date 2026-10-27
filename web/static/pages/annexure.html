@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Annexure-D · Bond Amortization</title>
+<link rel="stylesheet" href="/static/css/app.css">
+<link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+<style>
+  #t th.grp { text-align: center; background: #eef3f9; }
+  /* three header rows: stick the whole header block instead of each row */
+  #t thead { position: sticky; top: 0; z-index: 4; }
+  #t thead th { position: static; }
+  #t thead th.sticky { position: sticky; left: 0; z-index: 5; }
+  .report-head { text-align: center; margin-bottom: 12px; }
+  .report-head h1 { font-size: 18px; } .report-head div { color: var(--ink-2); }
+</style>
+</head>
+<body>
+<main style="max-width:none">
+  <div class="crumbs"><a href="/">Companies</a> / <a id="c-fund"></a> / Annexure-D</div>
+  <div class="panel">
+    <div class="inline">
+      <div class="field"><label for="start">Previous period end</label><input type="text" id="start" placeholder="30-Jun-26"><div class="hint" id="start-h"></div></div>
+      <div class="field"><label for="end">Period end</label><input type="text" id="end" placeholder="30-Sep-26"><div class="hint" id="end-h"></div></div>
+      <button class="primary" id="go">Show</button>
+      <button id="q">Latest quarter</button>
+      <button id="y">Latest financial year</button>
+      <a class="btn" id="xlsx">Download Excel</a>
+      <a class="btn" id="pdf">Download PDF</a>
+    </div>
+  </div>
+  <div id="msg" hidden></div>
+  <div class="report-head"><h1 id="fund-name"></h1><div id="line2">Schedule of Bond Investment</div><div id="period"></div></div>
+  <div id="warn" hidden></div>
+  <div class="panel flush"><div class="table-wrap" style="max-height:75vh"><table id="t"></table></div></div>
+  <p class="muted small" id="foot"></p>
+</main>
+<script src="/static/js/core.js"></script>
+<script>
+(async () => {
+  const me = await App.init({ nav: "funds" });
+  if (!me) return;
+  const $ = App.$;
+  const code = App.qs("code");
+  $("#c-fund").textContent = code; $("#c-fund").href = App.url("/fund", { code });
+  App.dateInput($("#start"), $("#start-h")); App.dateInput($("#end"), $("#end-h"));
+
+  const COLS = [
+    ["A", "Serial", "serial", "int", "sticky"], ["B", "ISIN", "isin", "text", ""], ["C", "Issue date", "issue_date", "date"],
+    ["D", "Purchase date", "purchase_date", "date"], ["E", "Maturity date", "maturity_date", "date"], ["F", "Nature", "nature", "text"],
+    ["G", "Coupon rate", "coupon_rate", "pct2"], ["H", "IRR", "irr", "pct"], ["I", "Face value", "face_value", "money"],
+    ["J", "Purchase / settlement price", "settlement_amount", "money"],
+    ["K", "Opening investment", "opening_investment", "money"], ["L", "Investment during the period", "investment", "money"],
+    ["M", "Amortization discount / (premium)", "amortization", "money"], ["N", "Encashed", "encashed", "money"],
+    ["O", "Closing balance", "closing_balance", "money"],
+    ["P", "Opening interest", "opening_interest", "money"], ["Q", "Interest income during the period", "interest_income", "money"],
+    ["R", "Holding period interest", "holding_period_interest", "money"], ["S", "Gross interest receipt", "gross_interest_receipt", "money"],
+    ["T", "Interest receipt", "interest_receipt", "money"], ["U", "TDS", "tds", "money"], ["V", "Encashed", "encashed_interest", "money"],
+    ["W", "Closing interest receivable", "closing_interest_receivable", "money"], ["X", "Gain / (loss) on sale", "gain_loss", "money"],
+  ];
+  const TOTALS = new Set(["face_value", "settlement_amount", "opening_investment", "investment", "amortization", "encashed", "closing_balance",
+    "opening_interest", "interest_income", "holding_period_interest", "gross_interest_receipt", "interest_receipt", "tds",
+    "encashed_interest", "closing_interest_receivable", "gain_loss"]);
+
+  function fmt(type, v) {
+    switch (type) {
+      case "money": return App.money(v);
+      case "pct": return App.pct(v);
+      case "pct2": return App.pct(v, 2);
+      case "date": return App.date(v);
+      default: return App.esc(v);
+    }
+  }
+  function render(a) {
+    // company on top when known, then the fund (same headings as the Excel and PDF reports)
+    $("#fund-name").textContent = a.fund.company_name || a.fund.name;
+    $("#line2").textContent = a.fund.company_name ? a.fund.name + " · Schedule of Bond Investment" : "Schedule of Bond Investment";
+    $("#period").textContent = "For the period " + App.date(nextDay(a.period_start)) + " to " + App.date(a.period_end);
+    const head = "<thead><tr class=\"letters\">" + COLS.map((c) => '<th class="' + (c[4] || "") + '">' + c[0] + "</th>").join("") + "</tr>" +
+      '<tr><th class="grp sticky" colspan="10">Particulars</th><th class="grp" colspan="5">Principal</th><th class="grp" colspan="8">Interest</th><th class="grp">Sale</th></tr>' +
+      "<tr>" + COLS.map((c) => '<th class="wrap ' + (["money", "pct", "pct2", "int"].includes(c[3]) ? "n " : "") + (c[4] || "") + '">' + App.esc(c[1]) + "</th>").join("") + "</tr></thead>";
+    const body = "<tbody>" + (a.rows.length ? a.rows.map((r) => "<tr>" + COLS.map((c) => {
+      const v = r[c[2]];
+      const num = ["money", "pct", "pct2", "int"].includes(c[3]);
+      const cls = [c[4], num ? "n" : "", c[3] === "money" && v < -0.5 ? "neg" : ""].filter(Boolean).join(" ");
+      const title = c[3] === "money" ? ' title="' + App.money2(v) + '"' : "";
+      const content = c[2] === "isin" ? '<a href="' + App.url("/bond", { fund: code, isin: r.isin }) + '">' + App.esc(v) + "</a>" : fmt(c[3], v);
+      return '<td class="' + cls + '"' + title + ">" + content + "</td>";
+    }).join("") + "</tr>").join("") : '<tr><td class="empty" colspan="' + COLS.length + '">No bonds were held in this period</td></tr>') + "</tbody>";
+    const foot = a.rows.length ? "<tfoot><tr>" + COLS.map((c, i) => i === 0 ? '<td class="sticky">Total</td>'
+      : TOTALS.has(c[2]) ? '<td class="n" title="' + App.money2(a.totals[c[2]]) + '">' + App.money(a.totals[c[2]]) + "</td>" : "<td></td>").join("") + "</tr></tfoot>" : "";
+    $("#t").innerHTML = head + body + foot;
+    if (a.warnings.length) App.message("#warn", "warn", "Notes:", a.warnings); else App.message("#warn", null);
+    $("#foot").textContent = "O = K + L + M − N · W = P + Q − M − S + R − V · S = T + U. Amounts in Taka, rounded for display; hover a figure for two decimals.";
+  }
+  function nextDay(iso) { const d = new Date(iso + "T00:00:00Z"); d.setUTCDate(d.getUTCDate() + 1); return d.toISOString().slice(0, 10); }
+
+  async function load(start, end) {
+    App.message("#msg", null);
+    try {
+      const a = await App.api("GET", App.url("/api/funds/" + encodeURIComponent(code) + "/annexure", { start, end }));
+      $("#start").setIso(a.period_start); $("#end").setIso(a.period_end);
+      history.replaceState(null, "", App.url("/annexure", { code, start: a.period_start, end: a.period_end }));
+      document.title = "Annexure-D " + App.date(a.period_end) + " · " + code;
+      render(a);
+      $("#xlsx").href = App.url("/api/funds/" + encodeURIComponent(code) + "/annexure.xlsx", { start: a.period_start, end: a.period_end });
+      $("#pdf").href = App.url("/api/funds/" + encodeURIComponent(code) + "/annexure.pdf", { start: a.period_start, end: a.period_end });
+    } catch (e) { App.showErrors("#msg", e); }
+  }
+  $("#go").addEventListener("click", () => {
+    const s = $("#start").getIso(), e = $("#end").getIso();
+    if (!s || !e) { App.message("#msg", "bad", "Enter both dates like 30-Jun-26."); return; }
+    load(s, e);
+  });
+  async function preset(quarterly) {
+    const p = await App.api("GET", App.url("/api/funds/" + encodeURIComponent(code) + "/default-period", { quarterly }));
+    load(p.start, p.end);
+  }
+  $("#q").addEventListener("click", () => preset(true));
+  $("#y").addEventListener("click", () => preset(false));
+  load(App.qs("start"), App.qs("end"));
+})();
+</script>
+</body>
+</html>
