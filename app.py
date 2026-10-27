@@ -1,7 +1,7 @@
 """Vercel entry point: Vercel loads the `app` object from this file (app.py at the project root).
 
 The data lives in the Neon Postgres database connected to the Vercel project (DATABASE_URL).
-If the database is not connected yet, every page explains what to do instead of crashing.
+If  check the database is not connected yet, every page explains what to do instead of crashing.
 """
 import logging
 
