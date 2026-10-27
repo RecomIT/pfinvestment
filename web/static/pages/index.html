@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Companies · Bond Amortization</title>
+<link rel="stylesheet" href="/static/css/app.css">
+<link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+</head>
+<body>
+<main>
+  <div class="page-head">
+    <div><h1>Companies</h1><div class="muted">Choose a company to see its funds</div></div>
+    <div class="actions">
+      <label class="check small"><input type="checkbox" id="arch"> Show archived</label>
+      <button class="primary" id="new" hidden>New company</button>
+    </div>
+  </div>
+  <div id="msg" hidden></div>
+  <div class="panel flush"><div class="table-wrap"><table id="t"></table></div></div>
+  <div class="panel flush" id="orphans-box" hidden>
+    <div class="panel-head"><h2>Funds without a company</h2><span class="muted small">Open a fund and use Fund settings to choose its company</span></div>
+    <div class="table-wrap"><table id="orphans"></table></div>
+  </div>
+</main>
+<script src="/static/js/core.js"></script>
+<script src="/static/js/fund_form.js"></script>
+<script>
+(async () => {
+  const me = await App.init({ nav: "funds" });
+  if (!me) return;
+  async function load() {
+    try {
+      const arch = App.$("#arch").checked;
+      const [companies, orphans] = await Promise.all([
+        App.api("GET", "/api/companies?include_archived=" + arch),
+        App.api("GET", "/api/funds?company=&include_archived=" + arch),
+      ]);
+      App.renderTable(App.$("#t"), [
+        { label: "Code", html: true, get: (c) => '<a href="' + App.url("/company", { code: c.code }) + '">' + App.esc(c.code) + "</a>" },
+        { label: "Company name", key: "name" },
+        { label: "Funds", key: "funds", type: "int" },
+        { label: "", html: true, get: (c) => c.archived ? '<span class="badge">archived</span>' : "" },
+      ], companies);
+      App.$("#orphans-box").hidden = orphans.length === 0;
+      App.renderTable(App.$("#orphans"), [
+        { label: "Fund code", html: true, get: (f) => '<a href="' + App.url("/fund", { code: f.code }) + '">' + App.esc(f.code) + "</a>" },
+        { label: "Fund name", key: "name" },
+      ], orphans);
+    } catch (e) { App.message("#msg", "bad", e.message); }
+  }
+  App.$("#arch").addEventListener("change", load);
+  if (App.can("admin")) {
+    App.$("#new").hidden = false;
+    App.$("#new").addEventListener("click", () => App.companyDialog(null, (c) => { location.href = App.url("/company", { code: c.code }); }));
+  }
+  load();
+})();
+</script>
+</body>
+</html>
