@@ -286,7 +286,7 @@ def bond_pdf(rec: BondRecord, fund: Fund, printed_by: str,
         story += [PageBreak(), Paragraph(f"{heading}: interest income, amortization and carrying value", ST_H2),
                   Paragraph(_esc(f"Each period runs from the day after the previous date (first: {dmy(start)}) to the "
                                  f"cut-off date. Coupon periods are split at cut-off dates on the {basis} basis; the "
-                                 f"first (stub) period uses actual days."), ST_NOTE), Spacer(1, 2 * mm),
+                                 f"first (stub) period uses " + ("stub days + 1 (Bangladesh Bank)." if b.day_basis == DayBasis.EXCEL_182 else "actual days.")), ST_NOTE), Spacer(1, 2 * mm),
                   _period_table(sched, cuts, start)]
 
     story.append(signoff(printed_by))

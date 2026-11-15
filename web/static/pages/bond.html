@@ -160,7 +160,7 @@
     try {
       const r = await App.api("GET", App.url(base + "/periods", params));
       setExcelLink(mode === "custom" ? { dates: params.dates, start: params.start } : null);
-      $("#basis-note").textContent = r.day_basis === "excel_182" ? "Split at cut-off: days ÷ 182 (Excel basis)" : "Split at cut-off: days ÷ actual days in the coupon period";
+      $("#basis-note").textContent = r.day_basis === "excel_182" ? "Split at cut-off: days ÷ 182 (Excel basis); first period after purchase: days ÷ (stub days + 1)" : "Split at cut-off: days ÷ actual days in the coupon period";
       const ok = (p) => Math.abs(p.carrying_check) < 0.01 && Math.abs(p.receivable_check) < 0.01;
       App.renderTable($("#per"), [
         { label: "Period end", key: "period_end", type: "date", cls: "sticky" },

@@ -5,7 +5,9 @@ holding at the end of day d. A reporting period (a, b] is simply state_at(b) - s
 so periods always add up to the schedule totals and openings always equal prior closings.
 
 Splitting a coupon period at a cut-off date (fraction f of the period earned):
-  * first (stub) period, purchase -> first coupon: f = (d - purchase) / (first coupon - purchase), any basis
+  * first (stub) period, purchase -> first coupon:
+      Excel mode:  f = (d - purchase) / (stub days + 1)   (Bangladesh Bank sheet: both end dates counted)
+      Actual mode: f = (d - purchase) / stub days
   * Excel mode:  f = min((d - last coupon) / 182, 1)
   * Actual mode: f = (d - last coupon) / (next coupon - last coupon)
 The slice that ends on the coupon date takes the remainder, so each period sums to 100%.
@@ -19,6 +21,10 @@ from typing import Optional
 
 from .models import DayBasis
 from .schedule import Schedule, ScheduleRow, excel_period_days
+
+# Excel / Bangladesh Bank rule for the first (stub) period: the period length counts both the purchase
+# date and the first coupon date, so 15-Sep-26 -> 29-Dec-26 (105 days) is split over 106 days.
+STUB_EXTRA_DAY = 1
 
 
 @dataclass(frozen=True)
@@ -44,7 +50,11 @@ def _fraction(sched: Schedule, row: ScheduleRow, d: date) -> float:
     if d >= row.end:
         return 1.0
     elapsed = (d - row.start).days
-    if row.index == 0 or sched.bond.day_basis == DayBasis.ACTUAL:
+    if row.index == 0:
+        if sched.bond.day_basis == DayBasis.EXCEL_182:
+            return elapsed / (row.days + STUB_EXTRA_DAY)      # e.g. 15 / 106 for 15-Sep -> 29-Dec
+        return elapsed / row.days
+    if sched.bond.day_basis == DayBasis.ACTUAL:
         return elapsed / row.days
     return min(elapsed / excel_period_days(sched.bond.frequency), 1.0)
 

@@ -157,7 +157,7 @@ def bond_workbook(rec: BondRecord, fund: Fund, selected: Optional[tuple[Optional
         ("Maturity date", "Maturity_Date", b.maturity_date, DATE, F_INPUT, None),
         ("Day basis at cut-off dates", "Day_Basis", BASIS_TEXT[b.day_basis], None, F_INPUT,
          "Excel 182: days since last coupon / 182. Actual: / actual days in the coupon period. "
-         "The first (stub) period always uses actual stub days."),
+         "First (stub) period: Excel 182 uses days / (stub days + 1), as the Bangladesh Bank sheet; Actual uses / stub days."),
         ("Excel half-year days", "Half_Year_Days", 182, "0", F_INPUT, "Fixed 182 days used by the Excel 182 basis"),
         ("IRR (XIRR of the cash flows)", "Bond_IRR",
          f"=XIRR(Schedule!$O$5:$O${n + 6},Schedule!$N$5:$N${n + 6})", PCT4, F_BODY,
@@ -304,7 +304,7 @@ def _period_sheet(wb, title: str, heading: str, start: date, cutoffs: list[date]
     """Calculation 2 as live formulas.
 
     Workings (lower table): the cumulative position at each date, exactly as engine.periods.state_at:
-      partial coupon row k = (full periods ended) + 1; fraction = stub: actual stub days,
+      partial coupon row k = (full periods ended) + 1; fraction = stub: days / (stub days + 1) in Excel 182, / stub days in Actual,
       Excel 182: MIN(days since last coupon / 182, 1), Actual: days / actual period days.
     Periods (upper table): differences between consecutive positions.
     """
@@ -336,7 +336,7 @@ def _period_sheet(wb, title: str, heading: str, start: date, cutoffs: list[date]
             "C": f'=COUNTIF({E},"<="&B{r})',
             "D": f"=C{r}+1",
             "E": f'=IF(D{r}<={n},INDEX({S},D{r}),"")',
-            "F": (f'=IF(D{r}>{n},0,IF(B{r}<=E{r},0,IF(D{r}=1,(B{r}-E{r})/INDEX({D},D{r}),'
+            "F": (f'=IF(D{r}>{n},0,IF(B{r}<=E{r},0,IF(D{r}=1,(B{r}-E{r})/(INDEX({D},D{r})+IF(Day_Basis="Excel 182",1,0)),'
                   f'IF(Day_Basis="Excel 182",MIN((B{r}-E{r})/Half_Year_Days,1),(B{r}-E{r})/INDEX({D},D{r})))))'),
             "G": f'=SUMIFS({I_},{E},"<="&B{r})+IF(D{r}<={n},F{r}*INDEX({I_},D{r}),0)',
             "H": f'=SUMIFS({A_},{E},"<="&B{r})+IF(D{r}<={n},F{r}*INDEX({A_},D{r}),0)',

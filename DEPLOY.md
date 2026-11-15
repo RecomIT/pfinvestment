@@ -1,5 +1,8 @@
 # Deploying Bond Amortization to Vercel (GitHub + Neon)
 
+> **Already deployed and your data is in Neon?** Go straight to **"Replacing the code of an existing
+> project"** below. Your database is not touched by uploading new code.
+
 This folder is ready to upload. It holds the same app as the office version, but the data is kept in a
 **Neon Postgres** database instead of the `data` folder. Nothing in it is secret: the database password
 lives only in Vercel's settings, never in these files.
@@ -18,7 +21,7 @@ lives only in Vercel's settings, never in these files.
    - Don't add a README
    - Click **Create repository**.
 2. On the new repository page, click **uploading an existing file**.
-3. Open this folder (`bond_app_vercel`) in Windows Explorer. Select **everything inside it** (Ctrl+A), including `.gitignore` and `.python-version`, and drag it all onto the GitHub page.
+3. Open this folder (`bond_app_vercel_v2`) in Windows Explorer. Select **everything inside it** (Ctrl+A), including `.gitignore` and `.python-version`, and drag it all onto the GitHub page.
 4. Click **Commit changes**.
 5. Check the file list. `app.py`, `vercel.json` and `requirements.txt` should be at the **top level** of the repository, not inside a sub-folder.
 
@@ -56,9 +59,13 @@ The office app keeps working as before. This step only **copies** its data.
 python -m venv .venv
 .venv\Scripts\activate
 pip install -r requirements.txt
-set DATABASE_URL=postgresql://...the value you copied...
+set "DATABASE_URL=postgresql://...the value you copied..."
 python manage_cloud.py import-data "D:\AI Implementation ReCom\PF-Investment-Bond\bond_app\data"
 ```
+
+Put the quotes exactly as shown: before `DATABASE_URL` and at the very end. The address contains `&`,
+and without the quotes Command Prompt cuts it off (error: *'channel_binding' / 'sslmode' is not recognized*).
+In PowerShell use `$env:DATABASE_URL="postgresql://..."` instead.
 
 The import copies everything:
 - companies, funds and bonds (with their version numbers)
@@ -73,7 +80,7 @@ At the end it checks that every bond in the cloud matches the office copy. If th
 python manage_cloud.py create-admin
 ```
 
-Other commands (each needs `set DATABASE_URL=...` first in the same window):
+Other commands (each needs `set "DATABASE_URL=..."` first in the same window):
 
 | Command | What it does |
 |---|---|
@@ -94,16 +101,39 @@ Open `https://<your-project>.vercel.app` (shown on the Vercel project page) and 
   - Dates and "printed on" times are in Bangladesh time
 - **Custom domain:** you can add one under **Settings → Domains**.
 
-## 6. Updating later
+## 6. Replacing the code of an existing project
+
+Use this when the Vercel project and the Neon database already exist (your data and users stay in Neon).
+
+1. Open your repository on github.com.
+2. Delete the old files: for a clean replace, open each top-level folder and file and delete it, or use
+   GitHub Desktop: delete everything in your local copy except the hidden `.git` folder.
+3. Upload **everything inside** `bond_app_vercel_v2` (Ctrl+A, including `.gitignore` and `.python-version`)
+   and **Commit changes**.
+4. Check on GitHub that `app.py` is at the top level and that its last line is `app = _build_app()`.
+5. Vercel starts a new deployment by itself. Wait for **Ready**. Do **not** use **Redeploy** on an older
+   deployment: that rebuilds the old code.
+6. Open the site and log in. No import is needed again.
+
+## 7. Updating later
 
 Make changes in the office version (`bond_app`) and test them there. Then rebuild this folder:
 
 ```
 cd "D:\AI Implementation ReCom\PF-Investment-Bond\bond_app"
-python make_vercel_folder.py
+python make_vercel_folder.py "D:\AI Implementation ReCom\PF-Investment-Bond\bond_app_vercel_v2"
 ```
 
-Upload the changed files to GitHub the same way as in step 1. Vercel redeploys automatically, and the database tables are kept.
+Upload the changed files to GitHub as in section 6. Vercel redeploys automatically, and the database tables are kept.
+
+## If a deployment fails
+
+| Message | Cause and fix |
+|---|---|
+| `FASTAPI_ENTRYPOINT_NOT_FOUND` | GitHub still has an old `app.py`, or the files sit inside a sub-folder. Check section 6, step 4. If the files are in a sub-folder, set **Settings → General → Root Directory** to that folder. |
+| Every page says "the database is not connected yet" | Neon is not connected to this project, or the deployment was built before connecting it. **Storage** → connect Neon, then Redeploy the **latest** deployment. |
+| "could not connect to the database" | The Neon database is paused or its password was changed. Open it in **Storage** and check it is running. |
+| `'sslmode' is not recognized` on your PC | Missing quotes in the `set` line. See section 4. |
 
 ## What is where
 
