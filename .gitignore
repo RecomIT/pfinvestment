@@ -1,8 +1,0 @@
-# never commit these: virtual environment, caches, local data, secrets
-.venv/
-__pycache__/
-*.pyc
-data/
-.env
-.env.*
-.vercel/
