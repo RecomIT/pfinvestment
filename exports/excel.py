@@ -7,7 +7,7 @@ Bond workbook (one per bond): every figure is a live Excel formula.
   TDS        - coupons received, TDS at the fund rate or the actual figure entered
 
 Annexure-D workbook (one per fund and period): values from the app, totals as SUM formulas.
-
+Created By Kamrul Hasan
 Only Excel-2007-era functions are used (XIRR, SUMIFS, COUNTIF, INDEX, MIN, IF, AND, OR) so the
 files open the same in every Excel version and in LibreOffice.
 """
