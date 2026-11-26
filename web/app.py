@@ -516,14 +516,16 @@ def create_app(data_dir: Optional[str | Path] = None, clock: Optional[Callable[[
                                  "Cache-Control": "no-store"})
 
     @app.get("/api/funds/{code}/bonds/{isin}/export.xlsx")
-    def bond_excel(code: str, isin: str, _: Viewer, dates: Optional[str] = None, start: Optional[date] = None):
+    def bond_excel(code: str, isin: str, _: Viewer, dates: Optional[str] = None, start: Optional[date] = None,
+                   cutoff: Optional[date] = Query(None, description="single cut-off date for right-side summary")):
         from exports.excel import bond_workbook
         fund = repo.get_fund(code)
         rec = repo.get_bond(code, isin)
         cuts = _parse_dates(dates)
         if start is not None and cuts and start >= cuts[0]:
             raise HTTPException(422, "start must be before the first cut-off date")
-        data = bond_workbook(rec, fund, (start, cuts) if cuts else None, company_name(fund))
+        data = bond_workbook(rec, fund, (start, cuts) if cuts else None, company_name(fund),
+                             cutoff_date=cutoff)
         return _download(data, f"{rec.isin}_amortization_{today_fn().isoformat()}.xlsx")
 
     @app.get("/api/funds/{code}/annexure.xlsx")
@@ -545,7 +547,8 @@ def create_app(data_dir: Optional[str | Path] = None, clock: Optional[Callable[[
                                  "Cache-Control": "no-store"})
 
     @app.get("/api/funds/{code}/bonds/{isin}/report.pdf")
-    def bond_report_pdf(code: str, isin: str, u: Viewer, dates: Optional[str] = None, start: Optional[date] = None):
+    def bond_report_pdf(code: str, isin: str, u: Viewer, dates: Optional[str] = None, start: Optional[date] = None,
+                        cutoff: Optional[date] = Query(None, description="single cut-off date for right-side summary")):
         from exports.pdf import bond_pdf
         fund = repo.get_fund(code)
         rec = repo.get_bond(code, isin)
@@ -553,7 +556,7 @@ def create_app(data_dir: Optional[str | Path] = None, clock: Optional[Callable[[
         if start is not None and cuts and start >= cuts[0]:
             raise HTTPException(422, "start must be before the first cut-off date")
         data = bond_pdf(rec, fund, u.full_name or u.username, (start, cuts) if cuts else None,
-                        company_name(fund))
+                        company_name(fund), cutoff_date=cutoff)
         return _pdf(data, f"{rec.isin}_amortization_{today_fn().isoformat()}.pdf")
 
     @app.get("/api/funds/{code}/annexure.pdf")

@@ -124,7 +124,7 @@ def annexure_titles(fund_name: str, company_name: str) -> tuple[str, str]:
 
 
 def bond_workbook(rec: BondRecord, fund: Fund, selected: Optional[tuple[Optional[date], list[date]]] = None,
-                  company_name: str = "") -> bytes:
+                  company_name: str = "", cutoff_date: Optional[date] = None) -> bytes:
     """Build the bond workbook. `selected` = (previous period end or None, cut-off dates) from the screen."""
     from engine.periods import fiscal_cutoffs
 
@@ -251,6 +251,45 @@ def bond_workbook(rec: BondRecord, fund: Fund, selected: Optional[tuple[Optional
     rng = {k: f"Schedule!${col}${first}:${col}${last}" for k, col in
            {"start": "B", "end": "C", "days": "D", "interest": "F", "coupon": "G", "recovered": "H",
             "amort": "J"}.items()}
+
+    # ------------------------------------------------------------------ cut-off date summary (right-side report)
+    if cutoff_date is not None:
+        from engine.periods import compute_periods, state_at
+        cutoff_rows = compute_periods(sched, [cutoff_date])
+        if cutoff_rows:
+            p = cutoff_rows[0]
+            # Find which schedule row the cutoff falls in
+            cutoff_sched_row = None
+            for i, row in enumerate(sched.rows):
+                if row.end > cutoff_date >= row.start:
+                    cutoff_sched_row = first + i
+                    break
+            if cutoff_sched_row is None:
+                # Check if cutoff lands exactly on a coupon date
+                for i, row in enumerate(sched.rows):
+                    if cutoff_date == row.end:
+                        cutoff_sched_row = first + i
+                        break
+            # Write headers
+            cutoff_heads = ["Closing carrying value", "Interest income", "Received",
+                            "Amortization", "Closing receivable"]
+            cutoff_vals = [p.closing_carrying, p.interest_income, p.coupon_gross,
+                           p.amortization, p.closing_receivable]
+            for ci, hd in enumerate(cutoff_heads):
+                col = chr(ord("Q") + ci)
+                _set(sh, f"{col}4", hd, F_HEADER)
+                sh.column_dimensions[col].width = 16
+            # Write values on the matching row (highlighted)
+            if cutoff_sched_row is not None:
+                yellow = PatternFill("solid", fgColor="FFFFDD")
+                for ci, val in enumerate(cutoff_vals):
+                    col = chr(ord("Q") + ci)
+                    cell = sh[f"{col}{cutoff_sched_row}"]
+                    cell.value = val
+                    cell.number_format = NUM
+                    cell.fill = yellow
+                # Also add the cutoff date label
+                _set(sh, f"Q3", f"Cut-off: {dmy(cutoff_date)}", F_NOTE)
 
     # ------------------------------------------------------------------ period sheets
     close = b.sale.sale_date if b.sale else b.maturity_date

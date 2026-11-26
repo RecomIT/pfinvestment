@@ -231,7 +231,8 @@ def _period_table(sched, cuts, start) -> Table:
 
 
 def bond_pdf(rec: BondRecord, fund: Fund, printed_by: str,
-             selected: Optional[tuple[Optional[date], list[date]]] = None, company_name: str = "") -> bytes:
+             selected: Optional[tuple[Optional[date], list[date]]] = None, company_name: str = "",
+             cutoff_date: Optional[date] = None) -> bytes:
     b = rec.bond
     sched = build_schedule(b)
     title = f"Bond amortization: {b.isin}"
@@ -275,6 +276,22 @@ def bond_pdf(rec: BondRecord, fund: Fund, printed_by: str,
     fixed = [8 * mm, 16 * mm, 16 * mm, 10 * mm]
     widths = fixed + [(usable - sum(fixed)) / 8] * 8
     story.append(_table(header, body, widths, {0, 3, 4, 5, 6, 7, 8, 9, 10, 11}, total))
+
+    # ---- cut-off date summary (right-side report)
+    if cutoff_date is not None:
+        from engine.periods import compute_periods
+        cutoff_rows = compute_periods(sched, [cutoff_date])
+        if cutoff_rows:
+            p = cutoff_rows[0]
+            story += [Spacer(1, 4 * mm),
+                      Paragraph(f"Cut-off date summary: {dmy(cutoff_date)}", ST_H2)]
+            story.append(_kv_table([
+                ("Closing carrying value", money2(p.closing_carrying)),
+                ("Interest income", money2(p.interest_income)),
+                ("Received", money2(p.coupon_gross)),
+                ("Amortization", money2(p.amortization)),
+                ("Closing receivable", money2(p.closing_receivable)),
+            ], columns=2))
 
     # ---- periods
     before = b.purchase_date - timedelta(days=1)

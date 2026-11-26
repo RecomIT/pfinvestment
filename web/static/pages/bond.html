@@ -26,6 +26,18 @@
   <section class="panel flush" data-pane="schedule">
     <div class="panel-head"><h2>Bond amortization schedule</h2><span class="muted small">Effective interest method · interest = opening × ((1 + IRR)<sup>days/365</sup> − 1)</span></div>
     <div class="table-wrap"><table id="sched"></table></div>
+    <div class="panel-head" style="flex-wrap:wrap;gap:10px;border-top:1px solid var(--border);margin-top:4px;padding-top:12px">
+      <div class="inline">
+        <div class="field"><label for="cutoff">Cut-off date</label>
+          <input type="text" id="cutoff" placeholder="30-Sep-26" style="width:130px">
+          <div class="hint" id="cutoff-h"></div></div>
+        <button id="cutoff-btn" class="btn primary" style="margin-top:18px">Show</button>
+        <button id="cutoff-clear" class="btn" style="margin-top:18px" hidden>Clear</button>
+      </div>
+      <span class="muted small">Figures at the cut-off date for reporting</span>
+    </div>
+    <div id="cutoff-msg" hidden style="margin:12px"></div>
+    <div id="cutoff-cards" class="cards" hidden style="margin:8px 16px 16px"></div>
   </section>
 
   <section class="panel flush" data-pane="periods" hidden>
@@ -83,11 +95,15 @@
   ].map(([k, v]) => '<div class="card"><div class="k">' + k + '</div><div class="v">' + v + "</div></div>").join("");
 
   /* Excel download: always years + quarters; plus the dates last shown on the By period tab */
+  let activeCutoff = null;
   function setExcelLink(params) {
-    $("#xlsx").href = App.url(base + "/export.xlsx", params || {});
-    $("#pdf").href = App.url(base + "/report.pdf", params || {});
+    const p = Object.assign({}, params || {});
+    if (activeCutoff) p.cutoff = activeCutoff;
+    $("#xlsx").href = App.url(base + "/export.xlsx", p);
+    $("#pdf").href = App.url(base + "/report.pdf", p);
     $("#xlsx").title = "Workbook with live formulas: inputs, schedule, years, quarters, TDS" +
-      (params && params.dates ? " and your chosen dates" : "");
+      (params && params.dates ? " and your chosen dates" : "") +
+      (activeCutoff ? " + cut-off summary at " + App.date(activeCutoff) : "");
   }
   setExcelLink();
 
@@ -182,6 +198,44 @@
         coupon_gross: App.sum(r.rows, "coupon_gross"), purchased_accrued_recovered: App.sum(r.rows, "purchased_accrued_recovered"),
         sale_accrued_received: App.sum(r.rows, "sale_accrued_received"), gain_loss: App.sum(r.rows, "gain_loss") } : null);
     } catch (e) { App.showErrors("#pmsg", e); }
+  }
+
+  /* ---------------- Cut-off date summary (right-side report) */
+  App.dateInput($("#cutoff"), $("#cutoff-h"));
+  $("#cutoff-btn").addEventListener("click", loadCutoff);
+  $("#cutoff").addEventListener("keydown", (e) => { if (e.key === "Enter") loadCutoff(); });
+  $("#cutoff-clear").addEventListener("click", () => {
+    activeCutoff = null;
+    $("#cutoff").value = "";
+    $("#cutoff-h").textContent = "";
+    $("#cutoff-cards").hidden = true;
+    $("#cutoff-clear").hidden = true;
+    App.message("#cutoff-msg", null);
+    setExcelLink();
+  });
+
+  async function loadCutoff() {
+    const iso = $("#cutoff").getIso ? $("#cutoff").getIso() : App.parseDate($("#cutoff").value.trim());
+    if (!iso) { App.message("#cutoff-msg", "bad", "Enter a date like 30-Sep-26."); return; }
+    App.message("#cutoff-msg", null);
+    try {
+      const r = await App.api("GET", App.url(base + "/periods", { mode: "custom", dates: iso }));
+      if (!r.rows.length) { App.message("#cutoff-msg", "bad", "No data for this date."); return; }
+      const p = r.rows[0];
+      activeCutoff = iso;
+      setExcelLink();
+      const items = [
+        ["Closing carrying value", App.money(p.closing_carrying)],
+        ["Interest income", App.money(p.interest_income)],
+        ["Received", App.money(p.coupon_gross)],
+        ["Amortization", App.money(p.amortization)],
+        ["Closing receivable", App.money(p.closing_receivable)],
+      ];
+      $("#cutoff-cards").innerHTML = items.map(([k, v]) =>
+        '<div class="card"><div class="k">' + k + '</div><div class="v">' + v + '</div></div>').join("");
+      $("#cutoff-cards").hidden = false;
+      $("#cutoff-clear").hidden = false;
+    } catch (e) { App.showErrors("#cutoff-msg", e); }
   }
 
   /* ---------------- history */
