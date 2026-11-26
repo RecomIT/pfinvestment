@@ -277,8 +277,8 @@ def bond_workbook(rec: BondRecord, fund: Fund, selected: Optional[tuple[Optional
                            p.amortization, p.closing_receivable]
             for ci, hd in enumerate(cutoff_heads):
                 col = chr(ord("Q") + ci)
-                _set(sh, f"{col}4", hd, F_HEADER)
-                sh.column_dimensions[col].width = 16
+                _set(sh, f"{col}4", hd, F_HEAD, fill=FILL_HEAD, border=BOX, align=WRAP)
+                sh.column_dimensions[col].width = 18
             # Write values on the matching row (highlighted)
             if cutoff_sched_row is not None:
                 yellow = PatternFill("solid", fgColor="FFFFDD")
